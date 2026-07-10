@@ -2,14 +2,18 @@
   "name": "nextjs-postgresql-template",
   "private": true,
   "scripts": {
+    "build": "next build",
     "dev": "next dev --turbopack",
     "dev-webpack": "next dev",
-    "build": "next build",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "upload": "opennextjs-cloudflare build && opennextjs-cloudflare upload",
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
   },
   "dependencies": {
     "@capacitor/android": "^7.6.7",
@@ -52,6 +56,6 @@
     "postcss": "8.5.8",
     "tailwindcss": "4.3.2",
     "typescript": "5.9.3",
-    "wrangler": "^4.86.0"
+    "wrangler": "^4.110.0"
   }
 }
