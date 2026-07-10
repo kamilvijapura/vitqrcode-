@@ -1,0 +1,198 @@
+@import "tailwindcss";
+
+/* ============================================================
+   QR Rewards — Material Design 3 Design System (Tailwind v4)
+   White-label ready: semantic colors are runtime-overridable
+   CSS variables. Brand colors can be swapped live via JS.
+   ============================================================ */
+
+@theme {
+  /* Brand palette (overridable for white-label) */
+  --color-brand: #4f46e5;
+  --color-brand-foreground: #ffffff;
+  --color-brand-soft: #eef2ff;
+  --color-brand-strong: #4338ca;
+  --color-secondary: #0ea5e9;
+  --color-accent: #f59e0b;
+
+  /* Surfaces & content (light defaults) */
+  --color-bg: #f6f7fb;
+  --color-surface: #ffffff;
+  --color-surface-2: #fbfbfd;
+  --color-elevated: #ffffff;
+  --color-border: #e8eaf0;
+  --color-border-strong: #d7dae3;
+  --color-content: #14181f;
+  --color-muted: #5b6472;
+  --color-subtle: #8b93a3;
+
+  /* Semantic */
+  --color-success: #16a34a;
+  --color-success-soft: #dcfce7;
+  --color-warning: #d97706;
+  --color-warning-soft: #fef3c7;
+  --color-danger: #dc2626;
+  --color-danger-soft: #fee2e2;
+  --color-info: #2563eb;
+  --color-info-soft: #dbeafe;
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
+  --radius-xl: 1rem;
+  --radius-2xl: 1.25rem;
+  --radius-3xl: 1.75rem;
+
+  --shadow-card: 0 1px 2px rgb(15 23 42 / 0.04),
+    0 4px 16px -2px rgb(15 23 42 / 0.06);
+  --shadow-pop: 0 8px 40px -8px rgb(15 23 42 / 0.22);
+}
+
+.dark {
+  --color-brand-soft: #1e1b4b;
+  --color-bg: #0a0d14;
+  --color-surface: #12161f;
+  --color-surface-2: #161b26;
+  --color-elevated: #1a2030;
+  --color-border: #232a38;
+  --color-border-strong: #2e3645;
+  --color-content: #eef1f7;
+  --color-muted: #a0a9bc;
+  --color-subtle: #6b7488;
+  --color-success-soft: #052e16;
+  --color-warning-soft: #2a1a05;
+  --color-danger-soft: #2a0a0a;
+  --color-info-soft: #0a1f3d;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3),
+    0 4px 16px -2px rgb(0 0 0 / 0.4);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-content);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background-color: color-mix(in srgb, var(--color-brand) 25%, transparent);
+  }
+  /* Scrollbars */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border-strong) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: var(--color-border-strong);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--color-subtle);
+    background-clip: padding-box;
+  }
+}
+
+@layer utilities {
+  .glass {
+    background: color-mix(in srgb, var(--color-surface) 72%, transparent);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+  }
+  .text-gradient {
+    background: linear-gradient(
+      120deg,
+      var(--color-brand),
+      var(--color-secondary)
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .bg-brand-gradient {
+    background: linear-gradient(
+      135deg,
+      var(--color-brand) 0%,
+      var(--color-secondary) 100%
+    );
+  }
+  .ring-focus:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand) 35%, transparent);
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+}
+
+/* ------------------------------------------------ animations -- */
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--color-surface-2);
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--color-content) 6%, transparent),
+    transparent
+  );
+  animation: shimmer 1.6s infinite;
+}
+
+@keyframes floaty {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+.animate-floaty { animation: floaty 5s ease-in-out infinite; }
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-brand) 45%, transparent); }
+  70% { box-shadow: 0 0 0 22px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+.animate-pulse-ring { animation: pulse-ring 2s infinite; }
+
+@keyframes scanline {
+  0% { top: 8%; }
+  50% { top: 88%; }
+  100% { top: 8%; }
+}
+.scanline { animation: scanline 2.4s ease-in-out infinite; }
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up { animation: fadeUp 0.5s ease both; }
+
+@keyframes spinSlow {
+  to { transform: rotate(360deg); }
+}
+.animate-spin-slow { animation: spinSlow 14s linear infinite; }

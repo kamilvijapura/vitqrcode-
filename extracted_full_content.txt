@@ -1,0 +1,50 @@
+Created At: 2026-07-08T14:00:05Z
+Completed At: 2026-07-08T14:00:15Z
+
+				The command failed with exit code: 1
+				Output:
+				At line:11 char:12
++   if (found) return;
++            ~
+Missing statement block after if ( condition ).
+At line:12 char:55
++   if (line.includes('export function DownloadCenter') && line.include ...
++                                                       ~~
+The token '&&' is not a valid statement separator in this version.
+At line:15 char:112
++ ... terprise-qr-rewards-platform (4)/extracted_full_content.txt', obj.con ...
++                                                                  ~
+Missing expression after ','.
+At line:15 char:113
++ ... se-qr-rewards-platform (4)/extracted_full_content.txt', obj.content);
++                                                             ~~~~~~~~~~~
+Unexpected token 'obj.content' in expression or statement.
+At line:15 char:112
++ ... terprise-qr-rewards-platform (4)/extracted_full_content.txt', obj.con ...
++                                                                  ~
+Missing closing ')' in expression.
+At line:14 char:22
++     if (obj.content) {
++                      ~
+Missing closing '}' in statement block or type definition.
+At line:12 char:92
++ ... port function DownloadCenter') && line.includes('doDownloadSheet')) {
++                                                                         ~
+Missing closing '}' in statement block or type definition.
+At line:10 char:25
++ rl.on('line', (line) => {
++                         ~
+Missing closing '}' in statement block or type definition.
+At line:17 char:81
++ ... Found and extracted to extracted_full_content.txt at step " + obj.ste ...
++                                                                  ~
+You must provide a value expression following the '+' operator.
+At line:17 char:82
++ ...  extracted to extracted_full_content.txt at step " + obj.step_index);
++                                                          ~~~~~~~~~~~~~~
+Unexpected token 'obj.step_index' in expression or statement.
+Not all parse errors were reported.  Correct the reported errors and try again.
+    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : MissingStatementBlock
+ 
+

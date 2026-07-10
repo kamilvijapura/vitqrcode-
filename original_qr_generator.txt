@@ -1,0 +1,809 @@
+Created At: 2026-07-08T06:03:10Z
+Completed At: 2026-07-08T06:03:10Z
+File Path: `file:///c:/Users/asus/Downloads/enterprise-qr-rewards-platform%20%284%29/src/components/admin/qr-generator.tsx`
+Total Lines: 1336
+Total Bytes: 72029
+Showing lines 1 to 800
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+1: "use client";
+2: 
+3: import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+4: import { createPortal } from "react-dom";
+5: import Link from "next/link";
+6: import { motion, AnimatePresence } from "framer-motion";
+7: import {  
+8:   Sparkles, Loader2, Layers, FileImage, Package,
+9:   CheckCircle2, ArrowRight, ArrowLeft, ShieldCheck, Printer, Plus,
+10:   Grid3x3, Scroll, Info, Minus, Settings, Trash, Edit3, X, Save, Maximize, ZoomIn, ZoomOut, ChevronLeft, ChevronRight, Lock, Unlock, Download , Trash2, Edit2, Ruler, Eye, MousePointer } from "lucide-react";
+11: import type { Product, Campaign } from "@/db/schema";
+12: import { generateBulkQrCodes, generateSingleQrCode, getBatchCodesForDownload } from "@/app/actions/qr";
+13: import { Card, Button, Input, Field, Select, Badge, EmptyState } from "@/components/ui";
+14: import { AccordionSection } from "@/components/accordion";
+15: import { CardPreview } from "@/components/card-designer/card-preview";
+16: import { useToast } from "@/components/toast";
+17: import { DEFAULT_DESIGN, type CardDesign } from "@/lib/card-designer-types";
+18: import {
+19:   downloadSinglePng, downloadSingleSvg, downloadBatchZip,
+20:   downloadSheetPdf, downloadRollPdf, computeSheetLayout, computeSheetLayoutAspect, getDesignAspectRatio, downloadManifestCsv,
+21:   type SheetOptions,
+22: } from "@/components/admin/qr-download";
+23: import { cn, formatNumber } from "@/lib/utils";
+24: 
+25: // ─── Types ──────────────────────────────────────────────────────────────────
+26: 
+27: interface TemplateRow {
+28:   id: number;
+29:   name: string;
+30:   category: string | null;
+31:   config: unknown;
+32:   thumbnail: string | null;
+33:   isDefault: boolean | null;
+34:   createdAt: Date;
+35: }
+36: 
+37: interface GeneratedCode {
+38:   id: number;
+39:   code: string;
+40:   status: string;
+41: }
+42: 
+43: const STEPS = ["Configure Reward", "Select Template", "Generate QR", "Print & Download"];
+44: 
+45: // ─── Sheet preset definitions ────────────────────────────────────────────────
+46: 
+47: interface SheetPresetDef {
+48:   label: string;
+49:   size: string;
+50:   perSheet: number;
+51:   cols: number;
+52:   rows: number;
+53: }
+54: 
+55: const SHEET_PRESETS: SheetPresetDef[] = [
+56:   { label: "A4 — 12 per sheet (3×4)", size: "A4", perSheet: 12, cols: 3, rows: 4 },
+57:   { label: "A4 — 24 per sheet (4×6)", size: "A4", perSheet: 24, cols: 4, rows: 6 },
+58:   { label: "A4 — 30 per sheet (5×6)", size: "A4", perSheet: 30, cols: 5, rows: 6 },
+59:   { label: "A4 — 40 per sheet (5×8)", size: "A4", perSheet: 40, cols: 5, rows: 8 },
+60:   { label: "A5 — 12 per sheet (3×4)", size: "A5", perSheet: 12, cols: 3, rows: 4 },
+61:   { label: "A5 — 20 per sheet (4×5)", size: "A5", perSheet: 20, cols: 4, rows: 5 },
+62:   { label: "US Letter — 24 per sheet (4×6)", size: "Letter", perSheet: 24, cols: 4, rows: 6 },
+63:   { label: "A3 — 50 per sheet (5×10)", size: "A3", perSheet: 50, cols: 5, rows: 10 },
+64: ];
+65: 
+66: interface IndustryPreset {
+67:   label: string;
+68:   mode: "sheet" | "roll";
+69:   sheetPresetIdx?: number;
+70:   rollWidth?: number;
+71:   rollGap?: number;
+72:   rollQrSize?: number;
+73:   rollCols?: number;
+74:   rollCutMarks?: boolean;
+75: }
+76: 
+77: const INDUSTRY_PRESETS: IndustryPreset[] = [
+78:   { label: "🎨 Paint Bucket Lid Sticker", mode: "roll", rollWidth: 80, rollGap: 10, rollQrSize: 50 },
+79:   { label: "🎨 Paint Can Side Label (A4)", mode: "sheet", sheetPresetIdx: 1 },
+80:   { label: "🛢 Lubricant Bottle Label", mode: "roll", rollWidth: 60, rollGap: 5, rollQrSize: 35 },
+81:   { label: "🛢 Lubricant Drum Label", mode: "roll", rollWidth: 100, rollGap: 8, rollQrSize: 70 },
+82:   { label: "📦 Carton Sticker (A5)", mode: "sheet", sheetPresetIdx: 4 },
+83:   { label: "📦 Product Warranty (A4 Large)", mode: "sheet", sheetPresetIdx: 0 },
+84:   { label: "🏷 Roll Label Standard", mode: "roll", rollWidth: 76, rollGap: 3, rollQrSize: 40 },
+85:   { label: "💳 Scratch Card (A4 Dense)", mode: "sheet", sheetPresetIdx: 3 },
+86: ];
+87: 
+88: // ─── Main Component ──────────────────────────────────────────────────────────
+89: 
+90: export function QrGenerator({
+91:   products,
+92:   templates,
+93:   campaigns,
+94: }: {
+95:   products: Product[];
+96:   templates: TemplateRow[];
+97:   campaigns: Campaign[];
+98: }) {
+99:   const { toast } = useToast();
+100: 
+101:   // — Workflow state —
+102:   const [step, setStep] = useState(0);
+103:   const [mode, setMode] = useState<"single" | "bulk" | "import">("bulk");
+104:   const [generating, setGenerating] = useState(false);
+105:   const [genProgress, setGenProgress] = useState(0);
+106: 
+107:   // — Configuration state —
+108:   const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(
+109:     templates.find((t) => t.isDefault)?.id ?? templates[0]?.id ?? null,
+110:   );
+111:   const [productId, setProductId] = useState<number>(products[0]?.id ?? 0);
+112:   const [campaignId, setCampaignId] = useState<number | "none">("none");
+113:   const [rewardType, setRewardType] = useState("points");
+114:   const [batchName, setBatchName] = useState("");
+115:   const [count, setCount] = useState(100);
+116:   const [expiryDate, setExpiryDate] = useState("");
+117:   const [internalNote, setInternalNote] = useState("");
+118:   const [templateSearch, setTemplateSearch] = useState("");
+119: 
+120:   // — Result state —
+121:   const [generatedCodes, setGeneratedCodes] = useState<GeneratedCode[]>([]);
+122:   const [batchSnapshot, setBatchSnapshot] = useState<CardDesign | null>(null);
+123: 
+124:   // — Derived values —
+125:   const product = products.find((p) => p.id === productId);
+126:   const campaign = campaigns?.find((c) => c.id === campaignId);
+127:   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
+128: 
+129:   // *** KEY FIX: Build design WITHOUT stripping frame/padding/containerRadius ***
+130:   // The generator should preserve ALL template settings faithfully.
+131:   const design: CardDesign = useMemo(() => {
+132:     const tConfig = (selectedTemplate?.config ?? {}) as Partial<CardDesign>;
+133:     return {
+134:       ...DEFAULT_DESIGN,
+135:       ...tConfig,
+136:       padding: { ...DEFAULT_DESIGN.padding, ...(tConfig.padding ?? {}) },
+137:       margin: { ...DEFAULT_DESIGN.margin, ...(tConfig.margin ?? {}) },
+138:       text: { ...DEFAULT_DESIGN.text, ...(tConfig.text ?? {}) },
+139:       logo: { ...DEFAULT_DESIGN.logo, ...(tConfig.logo ?? {}) },
+140:       qr: { ...DEFAULT_DESIGN.qr, ...(tConfig.qr ?? {}) },
+141:     };
+142:   }, [selectedTemplate]);
+143: 
+144:   // — Auto-generate batch name —
+145:   useEffect(() => {
+146:     if (mode === "bulk" && product) {
+147:       // If batch name is empty or looks like an auto-generated one, update it.
+148:       const dateStr = new Date().toISOString().split("T")[0];
+149:       const autoPattern = new RegExp(`^.*? Batch - \\d{4}-\\d{2}-\\d{2}$`);
+150:       if (!batchName || autoPattern.test(batchName)) {
+151:         setBatchName(`${product.name} Batch - ${dateStr}`);
+152:       }
+153:     }
+154:   }, [product, mode]);
+155: 
+156:   const previewCode = product
+157:     ? `CS-${String(product.sku).slice(-6)}-DEMO`
+158:     : "CS-DEMO";
+159: 
+160:   // — Step navigation —
+161:   const handleNextStep = useCallback(() => {
+162:     if (step === 1 && !selectedTemplateId) {
+163:       return toast({ tone: "warning", title: "Please select a template first" });
+164:     }
+165:     if (step === 0) {
+166:       if (!productId) return toast({ tone: "warning", title: "Select a product" });
+167:       if (mode === "bulk" && !batchName.trim()) return toast({ tone: "warning", title: "Batch name is required" });
+168:       if (mode === "bulk" && count < 1) return toast({ tone: "warning", title: "Quantity must be at least 1" });
+169:     }
+170:     setStep((s) => Math.min(STEPS.length - 1, s + 1));
+171:   }, [step, selectedTemplateId, productId, mode, batchName, count, toast]);
+172: 
+173:   // — QR generation —
+174:   const handleGenerate = useCallback(async () => {
+175:     setGenerating(true);
+176:     setGenProgress(10);
+177: 
+178:     const progressInterval = setInterval(() => {
+179:       setGenProgress((p) => Math.min(90, p + 12));
+180:     }, 350);
+181: 
+182:     try {
+183:       if (mode === "single") {
+184:         const res = await generateSingleQrCode({
+185:           productId,
+186:           templateId: selectedTemplateId ?? undefined,
+187:           campaignId: campaignId === "none" ? undefined : campaignId,
+188:           rewardType,
+189:           expiryDate: expiryDate || undefined,
+190:           internalNote,
+191:         });
+192:         clearInterval(progressInterval);
+193:         setGenProgress(100);
+194: 
+195:         if (!res.ok) {
+196:           toast({ tone: "error", title: "Generation failed", description: res.error ?? "Unknown error" });
+197:           setStep(1);
+198:           return;
+199:         }
+200:         toast({ tone: "success", title: "QR Code generated!", description: res.code });
+201:         const { codes, batch } = await getBatchCodesForDownload(res.batchId!);
+202:         setGeneratedCodes(codes as GeneratedCode[]);
+203:         setBatchSnapshot(batch?.designConfig ? { ...DEFAULT_DESIGN, ...(batch.designConfig as any) } : null);
+204:       } else {
+205:         const res = await generateBulkQrCodes({
+206:           productId,
+207:           templateId: selectedTemplateId ?? undefined,
+208:           count,
+209:           batchName,
+210:           source: "template",
+211:           designConfig: (selectedTemplate?.config ?? {}) as Record<string, unknown>,
+212:           campaignId: campaignId === "none" ? undefined : campaignId,
+213:           rewardType,
+214:           expiryDate: expiryDate || undefined,
+215:           internalNote,
+216:         });
+217:         clearInterval(progressInterval);
+218:         setGenProgress(100);
+219: 
+220:         if (!res.ok) {
+221:           toast({ tone: "error", title: "Generation failed", description: res.error ?? "Unknown error" });
+222:           setStep(1);
+223:           return;
+224:         }
+225:         toast({ tone: "success", title: `${res.count} codes generated!`, description: "Ready for print & download" });
+226:         const resBatch = await getBatchCodesForDownload(res.batchId!);
+227:         setGeneratedCodes(resBatch.codes as GeneratedCode[]);
+228:         setBatchSnapshot(resBatch.batch?.designConfig ? { ...DEFAULT_DESIGN, ...(resBatch.batch.designConfig as any) } : null);
+229:       }
+230:       setTimeout(() => setStep(3), 400);
+231:     } catch (e) {
+232:       clearInterval(progressInterval);
+233:       toast({ tone: "error", title: "Generation failed", description: e instanceof Error ? e.message : "Please try again" });
+234:       setStep(1);
+235:     } finally {
+236:       setGenerating(false);
+237:       setTimeout(() => setGenProgress(0), 800);
+238:     }
+239:   }, [mode, productId, selectedTemplateId, campaignId, rewardType, expiryDate, internalNote, count, batchName, selectedTemplate, toast]);
+240: 
+241:   const reset = useCallback(() => {
+242:     setStep(0);
+243:     setGeneratedCodes([]);
+244:     setBatchName("");
+245:   }, []);
+246: 
+247:   return (
+248:     <div className="flex flex-col lg:flex-row gap-6 items-start">
+249: 
+250:       {/* ─── Main Workflow Column ─── */}
+251:       <div className="flex-1 w-full min-w-0 flex flex-col gap-5">
+252: 
+253:         {/* Mode Tab Switcher */}
+254:         {step < 2 && (
+255:           <div className="flex rounded-lg border border-border bg-surface-2 p-1 w-fit">
+256:             {(["single", "bulk"] as const).map((m) => (
+257:               <button
+258:                 key={m}
+259:                 onClick={() => setMode(m)}
+260:                 className={cn(
+261:                   "px-4 py-1.5 text-sm font-semibold rounded-md capitalize transition-all",
+262:                   mode === m
+263:                     ? "bg-surface shadow text-content"
+264:                     : "text-muted hover:text-content",
+265:                 )}
+266:               >
+267:                 {m === "single" ? "Single QR" : "Bulk Batch"}
+268:               </button>
+269:             ))}
+270:           </div>
+271:         )}
+272: 
+273:         {/* Step Indicator */}
+274:         <div className="flex items-center gap-0 bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
+275:           {STEPS.map((label, idx) => (
+276:             <div
+277:               key={idx}
+278:               className={cn(
+279:                 "flex-1 flex items-center gap-3 px-4 py-3 border-r last:border-r-0 border-border transition-colors",
+280:                 step === idx ? "bg-brand/5" : "",
+281:               )}
+282:             >
+283:               <div
+284:                 className={cn(
+285:                   "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold border-2 transition-colors",
+286:                   step > idx
+287:                     ? "bg-brand border-brand text-white"
+288:                     : step === idx
+289:                       ? "border-brand text-brand bg-brand/10"
+290:                       : "border-border text-muted bg-surface-2",
+291:                 )}
+292:               >
+293:                 {step > idx ? <CheckCircle2 className="h-3.5 w-3.5" /> : idx + 1}
+294:               </div>
+295:               <span className={cn("text-xs font-semibold hidden sm:block leading-tight", step === idx ? "text-brand" : step > idx ? "text-content" : "text-muted")}>
+296:                 {label}
+297:               </span>
+298:             </div>
+299:           ))}
+300:         </div>
+301: 
+302:         {/* ─── Step Content ─── */}
+303:         <AnimatePresence mode="wait">
+304: 
+305:           {/* STEP 1: Select Template */}
+306:           {step === 1 && (
+307:             <motion.div key="s0" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.18 }}>
+308:               <Card className="p-6">
+309:                 <div className="flex items-center justify-between mb-5">
+310:                   <div>
+311:                     <h2 className="text-lg font-bold text-content">Select Saved Template</h2>
+312:                     <p className="text-sm text-subtle mt-0.5">All design settings, shapes, colors, and frames are preserved exactly.</p>
+313:                   </div>
+314:                   <Link href="/admin/qr/design">
+315:                     <Button variant="outline" size="sm"><Plus className="h-3.5 w-3.5 mr-1.5" /> New Template</Button>
+316:                   </Link>
+317:                 </div>
+318: 
+319:                 <div className="mb-6">
+320:                   <Input 
+321:                     placeholder="Search templates..." 
+322:                     value={templateSearch} 
+323:                     onChange={(e) => setTemplateSearch(e.target.value)} 
+324:                     className="max-w-xs"
+325:                   />
+326:                 </div>
+327: 
+328:                 {templates.length === 0 ? (
+329:                   <EmptyState
+330:                     icon={<Layers className="h-8 w-8" />}
+331:                     title="No Templates Yet"
+332:                     description="Create a QR design template first, then generate codes from it."
+333:                     action={<Link href="/admin/qr/design"><Button>Create Template</Button></Link>}
+334:                   />
+335:                 ) : (
+336:                   <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
+337:                     {templates.filter(t => t.name.toLowerCase().includes(templateSearch.toLowerCase()) || (t.category && t.category.toLowerCase().includes(templateSearch.toLowerCase()))).map((t) => {
+338:                       const isSel = selectedTemplateId === t.id;
+339:                       // Build design with full fidelity — no overrides
+340:                       const tConfig = (t.config ?? {}) as Partial<CardDesign>;
+341:                       const tDesign: CardDesign = {
+342:                         ...DEFAULT_DESIGN,
+343:                         ...tConfig,
+344:                         padding: { ...DEFAULT_DESIGN.padding, ...(tConfig.padding ?? {}) },
+345:                         margin: { ...DEFAULT_DESIGN.margin, ...(tConfig.margin ?? {}) },
+346:                         text: { ...DEFAULT_DESIGN.text, ...(tConfig.text ?? {}) },
+347:                         logo: { ...DEFAULT_DESIGN.logo, ...(tConfig.logo ?? {}) },
+348:                         qr: { ...DEFAULT_DESIGN.qr, ...(tConfig.qr ?? {}) },
+349:                       };
+350:                       return (
+351:                         <button
+352:                           key={t.id}
+353:                           type="button"
+354:                           onClick={() => setSelectedTemplateId(t.id)}
+355:                           className={cn(
+356:                             "group text-left rounded-xl border-2 bg-surface p-3 transition-all hover:border-brand/60 hover:shadow-md",
+357:                             isSel ? "border-brand ring-2 ring-brand/20 shadow-md" : "border-border",
+358:                           )}
+359:                         >
+360:                           <div className="flex h-28 items-center justify-center rounded-lg bg-surface-2 overflow-hidden">
+361:                             <div className="transition-transform group-hover:scale-105">
+362:                               <CardPreview design={{...tDesign, qrValue: "CS-PREVIEW-SAMPLE"}} previewWidth={90} />
+363:                             </div>
+364:                           </div>
+365:                           <div className="mt-3 flex items-start justify-between gap-1">
+366:                             <div className="min-w-0">
+367:                               <p className="text-sm font-bold text-content truncate">{t.name}</p>
+368:                               <p className="text-xs text-subtle capitalize truncate mt-0.5">{t.category || "General"}</p>
+369:                             </div>
+370:                             <div className="shrink-0 flex flex-col items-end gap-1">
+371:                               {t.isDefault && <Badge tone="success" className="text-[9px] py-0 px-1.5">Default</Badge>}
+372:                               {isSel && <CheckCircle2 className="h-4 w-4 text-brand" />}
+373:                             </div>
+374:                           </div>
+375:                         </button>
+376:                       );
+377:                     })}
+378:                   </div>
+379:                 )}
+380: 
+381:                 <div className="mt-6 flex justify-end">
+382:                   <Button onClick={handleNextStep} disabled={!selectedTemplateId} className="px-8">
+383:                     Continue <ArrowRight className="ml-2 h-4 w-4" />
+384:                   </Button>
+385:                 </div>
+386:               </Card>
+387:             </motion.div>
+388:           )}
+389: 
+390:           {/* STEP 0: Configure Reward */}
+391:           {step === 0 && (
+392:             <motion.div key="s1" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.18 }}>
+393:               <Card className="p-6">
+394:                 <div className="mb-5">
+395:                   <h2 className="text-lg font-bold text-content">Configure Reward Rules</h2>
+396:                   <p className="text-sm text-subtle mt-0.5">Bind this batch to a product, campaign, and reward structure.</p>
+397:                 </div>
+398: 
+399:                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+400:                     {/* Left column: Reward Strategy */}
+401:                     <div className="space-y-4 bg-surface-2 p-5 rounded-xl border border-border">
+402:                       <h3 className="font-bold text-content text-sm mb-4 border-b border-border/50 pb-2 uppercase tracking-wider text-muted">Reward Strategy</h3>
+403:                       
+404:                       <Field label="Target Product" required>
+405:                         <div className="flex items-center gap-3">
+406:                           <Select className="flex-1" value={productId} onChange={(e) => setProductId(Number(e.target.value))}>
+407:                             {products.map((p) => (
+408:                               <option key={p.id} value={p.id}>{p.name} — {p.sku}</option>
+409:                             ))}
+410:                           </Select>
+411:                           {product && (
+412:                             <Badge tone="success" className="shrink-0 flex items-center gap-1">
+413:                               <Sparkles className="h-3.5 w-3.5" />
+414:                               {product.rewardPoints || 0} pts
+415:                             </Badge>
+416:                           )}
+417:                         </div>
+418:                       </Field>
+419: 
+420:                       <Field label="Active Campaign">
+421:                         <Select value={campaignId} onChange={(e) => setCampaignId(e.target.value === "none" ? "none" : Number(e.target.value))}>
+422:                           <option value="none">— No Campaign —</option>
+423:                           {campaigns?.map((c) => (
+424:                             <option key={c.id} value={c.id}>{c.name}</option>
+425:                           ))}
+426:                         </Select>
+427:                       </Field>
+428: 
+429:                       <Field label="Reward Type">
+430:                         <Select value={rewardType} onChange={(e) => setRewardType(e.target.value)}>
+431:                           <option value="points">Points (inherit from product)</option>
+432:                           <option value="fixed">Fixed Reward / Coupon</option>
+433:                           <option value="tracking">No Reward — Tracking Only</option>
+434:                         </Select>
+435:                       </Field>
+436: 
+437:                       {rewardType === "points" && product && (
+438:                         <div className="flex items-center gap-3 rounded-lg border border-brand/20 bg-brand/5 p-3 mt-4">
+439:                           <Sparkles className="h-4 w-4 text-brand shrink-0" />
+440:                           <p className="text-sm">
+441:                             <span className="font-bold text-brand">{product.rewardPoints} pts</span>
+442:                             <span className="text-subtle"> per scan from product config</span>
+443:                           </p>
+444:                         </div>
+445:                       )}
+446:                     </div>
+447: 
+448:                     {/* Right column: Batch Details */}
+449:                     <div className="space-y-4 bg-surface-2 p-5 rounded-xl border border-border">
+450:                       <h3 className="font-bold text-content text-sm mb-4 border-b border-border/50 pb-2 uppercase tracking-wider text-muted">Batch Details</h3>
+451:                       
+452:                       {mode === "bulk" && (
+453:                         <>
+454:                           <Field label="Batch Name" required>
+455:                             <Input
+456:                               value={batchName}
+457:                               onChange={(e) => setBatchName(e.target.value)}
+458:                               placeholder="e.g. Q3-2025 Paint Promo"
+459:                             />
+460:                           </Field>
+461:                           <Field label="Quantity" required>
+462:                             <Input
+463:                               type="number"
+464:                               min={1}
+465:                               max={5000}
+466:                               value={count}
+467:                               onChange={(e) => setCount(Math.min(5000, Math.max(1, Number(e.target.value))))}
+468:                             />
+469:                             {product && rewardType === "points" && (
+470:                               <div className="mt-2 text-xs flex justify-between bg-brand/5 p-2 rounded-md border border-brand/20">
+471:                                 <span className="text-subtle">Total Batch Liability:</span>
+472:                                 <span className="font-bold text-brand">{formatNumber(count * (product.rewardPoints || 0))} pts</span>
+473:                               </div>
+474:                             )}
+475:                           </Field>
+476:                         </>
+477:                       )}
+478:                       {mode === "single" && (
+479:                         <Field label="Quantity">
+480:                           <Input value="1" disabled />
+481:                           <p className="text-xs text-subtle mt-1">Single QR mode generates exactly 1 unique code.</p>
+482:                         </Field>
+483:                       )}
+484: 
+485:                       <Field label="Expiry Date (Optional)">
+486:                         <Input type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} />
+487:                       </Field>
+488: 
+489:                       <Field label="Internal Note (Audit Trail)">
+490:                         <Input value={internalNote} onChange={(e) => setInternalNote(e.target.value)} placeholder="Visible to admins only" />
+491:                       </Field>
+492:                     </div>
+493:                   </div>
+494: 
+495:                 <div className="mt-6 flex justify-between">
+496:                   <Button variant="outline" onClick={() => setStep(0)}>
+497:                     <ArrowLeft className="mr-2 h-4 w-4" /> Back
+498:                   </Button>
+499:                   <Button onClick={handleNextStep} className="px-8">
+500:                     Review & Generate <ArrowRight className="ml-2 h-4 w-4" />
+501:                   </Button>
+502:                 </div>
+503:               </Card>
+504:             </motion.div>
+505:           )}
+506: 
+507:           {/* STEP 2: Generate */}
+508:           {step === 2 && (
+509:             <motion.div key="s2" initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
+510:               <Card className="p-12 flex flex-col items-center text-center">
+511:                 {!generating && genProgress === 0 ? (
+512:                   <>
+513:                     <div className="h-20 w-20 rounded-full border-8 border-surface bg-surface-2 shadow-lg flex items-center justify-center mb-6">
+514:                       <Sparkles className="h-9 w-9 text-brand" />
+515:                     </div>
+516:                     <h2 className="text-2xl font-bold text-content mb-2">Ready to Generate</h2>
+517:                     <p className="text-muted max-w-lg mb-3">
+518:                       Generating{" "}
+519:                       <strong className="text-content">{mode === "bulk" ? formatNumber(count) : "1"}</strong>{" "}
+520:                       cryptographically unique{count > 1 ? " codes" : " code"} bound to{" "}
+521:                       <strong className="text-content">{product?.name}</strong> using template{" "}
+522:                       <strong className="text-content">{selectedTemplate?.name}</strong>.
+523:                     </p>
+524:                     <div className="flex items-start gap-2 text-xs text-subtle bg-surface-2 rounded-lg border border-border px-4 py-2.5 max-w-sm mb-8">
+525:                       <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-brand" />
+526:                       Codes are non-repetitive and protected by unique DB constraints. Rewards are only awarded on server-side redemption — not on scan.
+527:                     </div>
+528:                     <div className="flex gap-3">
+529:                       <Button variant="outline" onClick={() => setStep(1)}>Cancel</Button>
+530:                       <Button size="lg" onClick={handleGenerate} className="px-10">
+531:                         Generate {mode === "bulk" ? "Batch" : "Code"}
+532:                       </Button>
+533:                     </div>
+534:                   </>
+535:                 ) : (
+536:                   <>
+537:                     <Loader2 className="h-14 w-14 text-brand animate-spin mb-5" />
+538:                     <h2 className="text-xl font-bold text-content mb-1">
+539:                       {genProgress < 100 ? "Generating Secure Codes…" : "Finalizing Batch…"}
+540:                     </h2>
+541:                     <p className="text-sm text-subtle mb-5">Creating cryptographically unique, database-protected QR codes</p>
+542:                     <div className="w-full max-w-sm bg-surface-2 rounded-full h-2.5 overflow-hidden border border-border">
+543:                       <div className="bg-brand h-full transition-all duration-300 rounded-full" style={{ width: `${genProgress}%` }} />
+544:                     </div>
+545:                     <p className="text-xs text-muted mt-2">{genProgress}%</p>
+546:                   </>
+547:                 )}
+548:               </Card>
+549:             </motion.div>
+550:           )}
+551: 
+552:           {/* STEP 3: Print & Download */}
+553:           {step === 3 && (
+554:             <motion.div key="s3" initial={{ opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.18 }}>
+555:               <Card className="p-6">
+556:                 <div className="flex items-center justify-between mb-5 pb-4 border-b border-border">
+557:                   <div>
+558:                     <h2 className="text-xl font-bold text-success flex items-center gap-2">
+559:                       <CheckCircle2 className="h-6 w-6" />
+560:                       {generatedCodes.length} Codes Ready
+561:                     </h2>
+562:                     <p className="text-sm text-subtle mt-0.5">Configure your print layout and download print-ready files.</p>
+563:                   </div>
+564:                   <Button variant="outline" size="sm" onClick={reset}>Start New Batch</Button>
+565:                 </div>
+566: 
+567:                 <DownloadCenter codes={generatedCodes} design={batchSnapshot ?? design} product={products.find(p => p.id === Number(productId))} />
+568:               </Card>
+569:             </motion.div>
+570:           )}
+571: 
+572:         </AnimatePresence>
+573:       </div>
+574: 
+575:       {/* ─── Right Summary Panel ─── */}
+576:       <div className="w-full lg:w-72 xl:w-80 shrink-0 sticky top-24 space-y-4">
+577:         <Card className="p-5">
+578:           <h3 className="text-xs font-bold uppercase tracking-wider text-muted mb-4 pb-2 border-b border-border/60">Configuration Summary</h3>
+579: 
+580:           {/* Live QR preview — uses FULL design from template */}
+581:           <div className="flex justify-center mb-5">
+582:             <div className="p-3 bg-surface-2 rounded-xl border border-border/50 shadow-inner inline-flex items-center justify-center">
+583:               <CardPreview design={{...design, qrValue: previewCode}} previewWidth={130} />
+584:             </div>
+585:           </div>
+586: 
+587:           {selectedTemplate && (
+588:             <p className="text-[10px] text-center text-subtle mb-4 font-medium uppercase tracking-wider">
+589:               Template: {selectedTemplate.name}
+590:             </p>
+591:           )}
+592: 
+593:           <div className="space-y-3 text-sm">
+594:             <SummaryRow label="Product" value={product?.name ?? "Not selected"} />
+595:             <SummaryRow label="SKU" value={product?.sku ?? "—"} />
+596:             {mode === "bulk" && <SummaryRow label="Batch" value={batchName || "Auto-named"} />}
+597:             <SummaryRow label="Quantity" value={mode === "single" ? "1" : formatNumber(count)} highlight />
+598:             <SummaryRow label="Campaign" value={campaign?.name ?? "None"} />
+599:             <SummaryRow label="Reward" value={rewardType === "points" ? `${product?.rewardPoints ?? 0} pts` : rewardType === "fixed" ? "Fixed Coupon" : "Tracking Only"} highlight />
+600:             {expiryDate && <SummaryRow label="Expires" value={expiryDate} />}
+601:           </div>
+602: 
+603:           <div className="mt-5 pt-4 border-t border-border/50">
+604:             <div className="flex items-start gap-2 text-xs text-subtle">
+605:               <ShieldCheck className="h-4 w-4 shrink-0 text-success mt-0.5" />
+606:               <span>Rewards are only awarded on successful server-side redemption — not on QR scan alone.</span>
+607:             </div>
+608:           </div>
+609:         </Card>
+610:         {step === 3 && <div id="export-portal-target" className="space-y-4" />}
+611: 
+612:       </div>
+613: 
+614:     </div>
+615:   );
+616: }
+617: 
+618: // ─── Summary Row ─────────────────────────────────────────────────────────────
+619: 
+620: function SummaryRow({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+621:   return (
+622:     <div className="flex items-center justify-between gap-2">
+623:       <span className="text-muted shrink-0">{label}</span>
+624:       <span className={cn("font-semibold text-right truncate max-w-[55%]", highlight ? "text-brand" : "text-content")}>
+625:         {value}
+626:       </span>
+627:     </div>
+628:   );
+629: }
+630: 
+631: // ─── Download Center ──────────────────────────────────────────────────────────
+632: 
+633: export function DownloadCenter({ codes, design, product }: { codes: GeneratedCode[]; design: CardDesign; product?: any }) {
+634:   const { toast } = useToast();
+635:   const [downloading, setDownloading] = useState<string | null>(null);
+636:   const [dlProgress, setDlProgress] = useState(0);
+637:   
+638:   const [portalNode, setPortalNode] = useState<Element | null>(null);
+639:   useEffect(() => {
+640:     setPortalNode(document.getElementById('export-portal-target'));
+641:   }, []);
+642:   
+643:   // ── Tabs ──
+644:   const [activeTab, setActiveTab] = useState<"sheet" | "roll" | "presets" | "industry">("sheet");
+645: 
+646:   // ── Sheet State ──
+647:   const [sheetSize, setSheetSize] = useState<string>("A4");
+648:   const [sheetOrientation, setSheetOrientation] = useState<"portrait"|"landscape">("portrait");
+649:   const [customSheetW, setCustomSheetW] = useState(21.0); // cm
+650:   const [customSheetH, setCustomSheetH] = useState(29.7); // cm
+651:   
+652:   const [labelW, setLabelW] = useState(design.width || 30);
+653:   const [labelH, setLabelH] = useState(design.height || 30);
+654:   const [lockAspect, setLockAspect] = useState(true);
+655: 
+656:   const [gapH, setGapH] = useState(4);
+657:   const [gapV, setGapV] = useState(4);
+658:   const [sheetMargin, setSheetMargin] = useState(10);
+659:   
+660:   const [gridMode, setGridMode] = useState<"auto"|"manual">("auto");
+661:   const [manualRows, setManualRows] = useState(6);
+662:   const [manualCols, setManualCols] = useState(5);
+663: 
+664:   // ── Roll State ──
+665:   const [rollWidth, setRollWidth] = useState(76);
+666:   const [rollLabelW, setRollLabelW] = useState(design.width || 40);
+667:   const [rollLabelH, setRollLabelH] = useState(design.height || 40);
+668: 
+669:   useEffect(() => {
+670:     if (design?.width) {
+671:       setLabelW(design.width);
+672:       setRollLabelW(design.width);
+673:     }
+674:     if (design?.height) {
+675:       setLabelH(design.height);
+676:       setRollLabelH(design.height);
+677:     }
+678:   }, [design?.width, design?.height]);
+679:   const [rollGapH, setRollGapH] = useState(3);
+680:   const [rollGapV, setRollGapV] = useState(3);
+681:   const [rollCols, setRollCols] = useState(1);
+682:   const [rollOffset, setRollOffset] = useState(0);
+683: 
+684:   // ── Preview State ──
+685:   const [currentPage, setCurrentPage] = useState(1);
+686:   const [zoom, setZoom] = useState(1);
+687:   const [fitToScreen, setFitToScreen] = useState(true);
+688:   const [showGridLines, setShowGridLines] = useState(false);
+689:   const [showCutMarks, setShowCutMarks] = useState(false);
+690:   const [showSafeArea, setShowSafeArea] = useState(false);
+691: 
+692:   // ── Presets State ──
+693:   const [savedPresets, setSavedPresets] = useState<any[]>([]);
+694:   const [isSavingPreset, setIsSavingPreset] = useState(false);
+695:   const [newPresetName, setNewPresetName] = useState("");
+696: 
+697:   useEffect(() => {
+698:     try {
+699:       const stored = localStorage.getItem("qr_print_presets");
+700:       if (stored) setSavedPresets(JSON.parse(stored));
+701:     } catch {}
+702:   }, []);
+703: 
+704:   const savePresetsToStorage = (presets: any[]) => {
+705:     setSavedPresets(presets);
+706:     localStorage.setItem("qr_print_presets", JSON.stringify(presets));
+707:   };
+708: 
+709:   const handleSavePreset = () => {
+710:     if (!newPresetName.trim()) return toast({ tone: "error", title: "Please enter a preset name." });
+711:     
+712:     const newPreset = {
+713:       label: newPresetName.trim(),
+714:       mode: activeTab,
+715:       size: sheetSize,
+716:       orientation: sheetOrientation,
+717:       customSheetW,
+718:       customSheetH,
+719:       labelW: activeTab === "sheet" ? labelW : rollLabelW,
+720:       labelH: activeTab === "sheet" ? labelH : rollLabelH,
+721:       gapH: activeTab === "sheet" ? gapH : rollGapH,
+722:       gapV: activeTab === "sheet" ? gapV : rollGapV,
+723:       sheetMargin,
+724:       gridMode,
+725:       manualRows,
+726:       manualCols,
+727:       rollWidth,
+728:       rollCols,
+729:     };
+730:     
+731:     const existingIdx = savedPresets.findIndex(p => p.label.toLowerCase() === newPresetName.trim().toLowerCase());
+732:     const updated = [...savedPresets];
+733:     if (existingIdx >= 0) {
+734:       updated[existingIdx] = newPreset;
+735:       toast({ tone: "success", title: "Preset Overwritten" });
+736:     } else {
+737:       updated.push(newPreset);
+738:       toast({ tone: "success", title: "Preset Saved" });
+739:     }
+740:     
+741:     savePresetsToStorage(updated);
+742:     setIsSavingPreset(false);
+743:     setNewPresetName("");
+744:   };
+745: 
+746:   const handleDeletePreset = (label: string, e: React.MouseEvent) => {
+747:     e.stopPropagation();
+748:     savePresetsToStorage(savedPresets.filter(p => p.label !== label));
+749:     toast({ tone: "info", title: "Preset Deleted" });
+750:   };
+751: 
+752:   // ── Derived Sheet Computations ──
+753:   const PAPER_SIZES: Record<string, {w: number, h: number}> = {
+754:     "A3": { w: 297, h: 420 },
+755:     "A4": { w: 210, h: 297 },
+756:     "A5": { w: 148, h: 210 },
+757:     "Letter": { w: 215.9, h: 279.4 },
+758:     "Legal": { w: 215.9, h: 355.6 },
+759:   };
+760: 
+761:   const currentPaper = sheetSize === "Custom" 
+762:     ? { w: customSheetW * 10, h: customSheetH * 10 } 
+763:     : PAPER_SIZES[sheetSize] || PAPER_SIZES["A4"];
+764:     
+765:   const paperW = sheetOrientation === "portrait" ? currentPaper.w : currentPaper.h;
+766:   const paperH = sheetOrientation === "portrait" ? currentPaper.h : currentPaper.w;
+767:   
+768:   const sheetLayout = useMemo(() => {
+769:     const availW = paperW - (sheetMargin * 2);
+770:     const availH = paperH - (sheetMargin * 2);
+771:     
+772:     let cols = manualCols;
+773:     let rows = manualRows;
+774:     
+775:     if (gridMode === "auto") {
+776:       cols = Math.floor((availW + gapH) / (labelW + gapH));
+777:       rows = Math.floor((availH + gapV) / (labelH + gapV));
+778:       if (cols < 1) cols = 1;
+779:       if (rows < 1) rows = 1;
+780:     }
+781:     
+782:     const perSheet = cols * rows;
+783:     const totalPages = Math.ceil(codes.length / perSheet) || 1;
+784:     
+785:     return {
+786:       cols, rows, perSheet, totalPages, paperW, paperH
+787:     };
+788:   }, [paperW, paperH, sheetMargin, gapH, gapV, labelW, labelH, gridMode, manualCols, manualRows, codes.length]);
+789: 
+790:   const rollLayout = useMemo(() => {
+791:     const rowsNeeded = Math.ceil(codes.length / rollCols) || 1;
+792:     const rollLen = (rollLabelH + rollGapV) * rowsNeeded;
+793:     return {
+794:       rows: rowsNeeded,
+795:       rollLen,
+796:       totalPages: 1
+797:     };
+798:   }, [codes.length, rollCols, rollLabelH, rollGapV]);
+799:   
+800:   // ── Presets Handlers ──
+The above content does NOT show the entire file contents. If you need to view any lines of the file which were not shown to complete your task, call this tool again to view those lines.
+

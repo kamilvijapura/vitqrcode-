@@ -1,0 +1,9 @@
+node_modules
+.next
+.env
+android/.gradle
+android/build
+android/app/build
+pgdata
+postgres_bin
+*.log
