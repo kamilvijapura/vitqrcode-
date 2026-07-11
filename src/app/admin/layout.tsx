@@ -6,11 +6,24 @@ import { AdminShell } from "@/components/admin/AdminShell";
 export const dynamic = "force-dynamic";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  await ensureSeeded();
-  const [company, session] = await Promise.all([
-    getCompany(),
-    getAdminSession(),
-  ]);
+  // Wrap in try-catch so a DB error doesn't crash the entire admin panel
+  try {
+    await ensureSeeded();
+  } catch (e) {
+    console.error("[AdminLayout] ensureSeeded error:", e);
+  }
+
+  let company = null;
+  let session = null;
+  try {
+    [company, session] = await Promise.all([
+      getCompany(),
+      getAdminSession(),
+    ]);
+  } catch (e) {
+    console.error("[AdminLayout] data fetch error:", e);
+  }
+
   return (
     <AdminShell
       appName={company?.appName ?? "Rewards"}

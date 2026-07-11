@@ -11,8 +11,19 @@ export default async function AppLayout({ children, params }: { children: React.
   const pathname = headersList.get("x-invoke-path") ?? "";
   const isLoginPage = pathname === "/app/login";
 
-  await ensureSeeded();
-  const company = await getCompany();
+  // Wrap in try-catch so a DB error doesn't crash the entire page
+  try {
+    await ensureSeeded();
+  } catch (e) {
+    console.error("[AppLayout] ensureSeeded error:", e);
+  }
+
+  let company = null;
+  try {
+    company = await getCompany();
+  } catch (e) {
+    console.error("[AppLayout] getCompany error:", e);
+  }
 
   if (isLoginPage) return <>{children}</>;
 
