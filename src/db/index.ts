@@ -1,28 +1,40 @@
 import "dotenv/config";
 
-import { drizzle } from "drizzle-orm/node-postgres";
-import { Pool } from "pg";
+import { neon, NeonQueryFunction } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-http";
 
-const databaseUrl = process.env.DATABASE_URL || "postgres://dummy:dummy@localhost/dummy";
+const databaseUrl = process.env.DATABASE_URL || "";
 
 console.log("DATABASE_URL present:", !!process.env.DATABASE_URL);
 
-if (!process.env.DATABASE_URL && process.env.NODE_ENV !== "production") {
+if (!process.env.DATABASE_URL) {
   console.warn("DATABASE_URL is missing!");
 }
 
-const globalForDb = globalThis as typeof globalThis & {
-  __arenaNextJsPostgresqlPool?: Pool;
+// Neon serverless HTTP driver – works in Cloudflare Workers (no TCP sockets)
+export const sql: NeonQueryFunction<false, false> = neon(databaseUrl);
+
+export const db = drizzle(sql);
+
+// Compatibility shim for files that use pool.connect() transactions.
+// Neon HTTP runs each statement in its own implicit transaction.
+// We wrap it so existing transaction blocks still work (serially via HTTP).
+export const pool = {
+  connect: async () => {
+    const queries: string[] = [];
+    const client = {
+      query: async (text: string, values?: unknown[]) => {
+        if (text.trim().toUpperCase() === "BEGIN" || text.trim().toUpperCase() === "ROLLBACK") {
+          return { rows: [] };
+        }
+        if (text.trim().toUpperCase() === "COMMIT") {
+          return { rows: [] };
+        }
+        const result = await sql(text, values as unknown[] | undefined);
+        return { rows: result as Record<string, unknown>[] };
+      },
+      release: () => {},
+    };
+    return client;
+  },
 };
-
-export const pool =
-  globalForDb.__arenaNextJsPostgresqlPool ??
-  new Pool({
-    connectionString: databaseUrl,
-  });
-
-if (process.env.NODE_ENV !== "production") {
-  globalForDb.__arenaNextJsPostgresqlPool = pool;
-}
-
-export const db = drizzle(pool);

@@ -188,17 +188,17 @@ export function QrHistory({
                           />
                         </div>
                         <div>
-                        <p className="font-semibold text-content">{b.name}</p>
-                        <p className="text-xs text-muted flex items-center gap-1.5 mt-0.5">
-                          <span className="font-medium text-content">{b.productName}</span>
-                          {b.productRewardPoints != null && (
-                            <>
-                              <span className="h-1 w-1 rounded-full bg-border" />
-                              <span className="font-bold text-brand">{b.productRewardPoints} pts</span>
-                            </>
-                          )}
-                        </p>
-                      </div>
+                          <p className="font-semibold text-content">{b.name}</p>
+                          <p className="text-xs text-muted flex items-center gap-1.5 mt-0.5">
+                            <span className="font-medium text-content">{b.productName}</span>
+                            {b.productRewardPoints != null && (
+                              <>
+                                <span className="h-1 w-1 rounded-full bg-border" />
+                                <span className="font-bold text-brand">{b.productRewardPoints} pts</span>
+                              </>
+                            )}
+                          </p>
+                        </div>
                       </div>
                       <button
                         onClick={() => setDel(b)}
@@ -235,24 +235,24 @@ export function QrHistory({
                     </div>
 
                     <div className="mt-4 flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      disabled={downloadingId === b.id}
-                      onClick={() => handleDownload(b)}
-                    >
-                      {downloadingId === b.id ? "..." : <><Download className="h-3.5 w-3.5 mr-1" /> Download</>}
-                    </Button>
-                    <Button
-                      variant="soft"
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => setSelectedBatch(b)}
-                    >
-                      View Codes <ChevronRight className="h-3.5 w-3.5 ml-1" />
-                    </Button>
-                  </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex-1"
+                        disabled={downloadingId === b.id}
+                        onClick={() => handleDownload(b)}
+                      >
+                        {downloadingId === b.id ? "..." : <><Download className="h-3.5 w-3.5 mr-1" /> Download</>}
+                      </Button>
+                      <Button
+                        variant="soft"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => setSelectedBatch(b)}
+                      >
+                        View Codes <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                      </Button>
+                    </div>
                   </Card>
                 </motion.div>
               );
@@ -378,7 +378,6 @@ function BatchDetailModal({
   );
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (batch) load(batch.id);
   }, [batch, load]);
 

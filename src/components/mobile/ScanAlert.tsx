@@ -11,7 +11,7 @@ export function ScanAlert() {
 
   useEffect(() => {
     if (shown) return;
-    
+
     const scanned = searchParams.get("scanned");
     const points = searchParams.get("points");
     const product = searchParams.get("product");
@@ -23,14 +23,13 @@ export function ScanAlert() {
         title: "Scan Successful! 🎉",
         description: `You earned ${points} points from scanning ${product}.`
       });
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShown(true);
       // Clean up URL without reloading
       window.history.replaceState({}, '', '/app/wallet');
     } else if (scanned === "error") {
-      const msg = reason === "already_redeemed" ? "This QR code has already been redeemed." 
-                : reason === "not_found" ? "Invalid or unrecognized QR code."
-                : "Failed to redeem code. Please try again.";
+      const msg = reason === "already_redeemed" ? "This QR code has already been redeemed."
+        : reason === "not_found" ? "Invalid or unrecognized QR code."
+          : "Failed to redeem code. Please try again.";
       toast({
         tone: "error",
         title: "Scan Failed",

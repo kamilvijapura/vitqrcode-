@@ -17,7 +17,7 @@ const ThemeContext = createContext<{
   theme: ThemeMode;
   toggle: () => void;
   setTheme: (t: ThemeMode) => void;
-}>({ theme: "light", toggle: () => {}, setTheme: () => {} });
+}>({ theme: "light", toggle: () => { }, setTheme: () => { } });
 
 export function useTheme() {
   return useContext(ThemeContext);
@@ -48,7 +48,7 @@ const BrandContext = createContext<{
   brand: BrandColors;
   setBrand: (b: BrandColors) => void;
   applyPreset: (name: string) => void;
-}>({ brand: DEFAULT_BRAND, setBrand: () => {}, applyPreset: () => {} });
+}>({ brand: DEFAULT_BRAND, setBrand: () => { }, applyPreset: () => { } });
 
 export function useBrand() {
   return useContext(BrandContext);
@@ -105,7 +105,6 @@ export function AppProviders({ children }: { children: ReactNode }) {
       typeof window !== "undefined" &&
       window.matchMedia("(prefers-color-scheme: dark)").matches;
     const initial = stored ?? (prefersDark ? "dark" : "light");
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setThemeState(initial);
     applyTheme(initial);
 
