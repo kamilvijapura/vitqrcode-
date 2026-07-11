@@ -5,9 +5,10 @@ import { QrDesignHub } from "@/components/admin/qr-design-hub";
 
 export const dynamic = "force-dynamic";
 
-export default async function QrDesignPage({ searchParams }: { searchParams: { id?: string } }) {
+export default async function QrDesignPage({ searchParams }: { searchParams: Promise<{ id?: string }> }) {
+  const params = await searchParams;
   const templates = await getQrTemplates();
-  const editId = searchParams.id ? Number(searchParams.id) : null;
+  const editId = params.id ? Number(params.id) : null;
   
   return (
     <div>
