@@ -30,8 +30,10 @@ export const pool = {
         if (text.trim().toUpperCase() === "COMMIT") {
           return { rows: [] };
         }
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const result = await sql(text, values as unknown[] | undefined);
-        return { rows: result as Record<string, unknown>[] };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return { rows: result as any[] };
       },
       release: () => {},
     };
