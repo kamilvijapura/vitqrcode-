@@ -54,6 +54,13 @@ export function useBrand() {
   return useContext(BrandContext);
 }
 
+function applyTheme(t: ThemeMode) {
+  if (typeof document === "undefined") return;
+  const root = document.documentElement;
+  if (t === "dark") root.classList.add("dark");
+  else root.classList.remove("dark");
+}
+
 function applyColors(b: BrandColors) {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
@@ -113,11 +120,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const applyTheme = (t: ThemeMode) => {
-    const root = document.documentElement;
-    if (t === "dark") root.classList.add("dark");
-    else root.classList.remove("dark");
-  };
+  // applyTheme is now moved outside to avoid dependency array issues
 
   const setTheme = useCallback((t: ThemeMode) => {
     setThemeState(t);
