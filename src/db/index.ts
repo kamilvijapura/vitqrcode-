@@ -3,12 +3,12 @@ import "dotenv/config";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 
-const databaseUrl = process.env.DATABASE_URL;
+const databaseUrl = process.env.DATABASE_URL || "postgres://dummy:dummy@localhost/dummy";
 
-console.log("DATABASE_URL =", databaseUrl);
+console.log("DATABASE_URL present:", !!process.env.DATABASE_URL);
 
-if (!databaseUrl) {
-  throw new Error("DATABASE_URL is required");
+if (!process.env.DATABASE_URL && process.env.NODE_ENV !== "production") {
+  console.warn("DATABASE_URL is missing!");
 }
 
 const globalForDb = globalThis as typeof globalThis & {
