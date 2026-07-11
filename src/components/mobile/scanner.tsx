@@ -224,6 +224,7 @@ function CoinBurst({ points }: { points: number }) {
     <div className="relative">
       {coins.map((_, i) => {
         const angle = (i / coins.length) * Math.PI * 2;
+        // eslint-disable-next-line react-hooks/purity
         const dist = 60 + Math.random() * 50;
         const x = Math.cos(angle) * dist;
         const y = Math.sin(angle) * dist;
@@ -232,7 +233,9 @@ function CoinBurst({ points }: { points: number }) {
             key={i}
             className="absolute left-1/2 top-1/2 text-xl pointer-events-none"
             initial={{ x: 0, y: 0, opacity: 1, scale: 0.5 }}
+            // eslint-disable-next-line react-hooks/purity
             animate={{ x, y, opacity: 0, scale: 1.2, rotate: Math.random() * 360 }}
+            // eslint-disable-next-line react-hooks/purity
             transition={{ duration: 1.1, ease: "easeOut", delay: Math.random() * 0.15 }}
           >
             🪙

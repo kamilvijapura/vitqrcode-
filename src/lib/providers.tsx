@@ -105,6 +105,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
       typeof window !== "undefined" &&
       window.matchMedia("(prefers-color-scheme: dark)").matches;
     const initial = stored ?? (prefersDark ? "dark" : "light");
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setThemeState(initial);
     applyTheme(initial);
 

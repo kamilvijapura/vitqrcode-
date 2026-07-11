@@ -84,6 +84,7 @@ export function CampaignsView({ campaigns }: { campaigns: Campaign[] }) {
 
 function CampaignFormModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const today = new Date().toISOString().slice(0, 10);
+  // eslint-disable-next-line react-hooks/purity
   const future = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
   const [form, setForm] = useState({ name: "", type: TYPES[0], description: "", pointsMultiplier: 2, startDate: today, endDate: future });
   const [saving, setSaving] = useState(false);

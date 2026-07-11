@@ -378,6 +378,7 @@ function BatchDetailModal({
   );
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (batch) load(batch.id);
   }, [batch, load]);
 

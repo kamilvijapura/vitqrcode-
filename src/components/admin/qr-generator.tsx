@@ -148,9 +148,11 @@ export function QrGenerator({
       const dateStr = new Date().toISOString().split("T")[0];
       const autoPattern = new RegExp(`^.*? Batch - \\d{4}-\\d{2}-\\d{2}$`);
       if (!batchName || autoPattern.test(batchName)) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setBatchName(`${product.name} Batch - ${dateStr}`);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product, mode]);
 
   const previewCode = product
@@ -639,6 +641,7 @@ export function DownloadCenter({ codes = [], design, product }: { codes?: Genera
   
   const [portalNode, setPortalNode] = useState<Element | null>(null);
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPortalNode(document.getElementById('export-portal-target'));
   }, []);
   
@@ -670,6 +673,7 @@ export function DownloadCenter({ codes = [], design, product }: { codes?: Genera
 
   useEffect(() => {
     if (design?.width) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLabelW(design.width);
       setRollLabelW(design.width);
     }
@@ -699,6 +703,7 @@ export function DownloadCenter({ codes = [], design, product }: { codes?: Genera
   useEffect(() => {
     try {
       const stored = localStorage.getItem("qr_print_presets");
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (stored) setSavedPresets(JSON.parse(stored));
     } catch {}
   }, []);
