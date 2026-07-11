@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 
 export const dynamic = "force-dynamic";
 
-export default async function AppLayout({ children, params }: { children: React.ReactNode; params?: unknown }) {
+export default async function AppLayout({ children, params }: { children: React.ReactNode; params?: Promise<unknown> }) {
   // Don't wrap the login page with the mobile shell
   const headersList = await headers();
   const pathname = headersList.get("x-invoke-path") ?? "";
