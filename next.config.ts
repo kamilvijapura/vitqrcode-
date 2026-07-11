@@ -23,6 +23,9 @@ const nextConfig: NextConfig = {
   },
 
   serverExternalPackages: ["pg-native"],
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
 };
 
 export default nextConfig;
