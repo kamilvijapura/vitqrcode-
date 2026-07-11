@@ -2,7 +2,7 @@
   "name": "nextjs-postgresql-template",
   "private": true,
   "scripts": {
-    "build": "opennextjs-cloudflare build",
+    "build": "next build",
     "dev": "next dev --turbopack",
     "dev-webpack": "next dev",
     "start": "next start",
