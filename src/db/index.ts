@@ -3,7 +3,9 @@ import "dotenv/config";
 import { neon, neonConfig, Pool } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 
-const databaseUrl = process.env.DATABASE_URL || "";
+// Fallback prevents neon() from throwing during Next.js build when DATABASE_URL is not set.
+// At runtime on Cloudflare the real DATABASE_URL env var is always present.
+const databaseUrl = process.env.DATABASE_URL || "postgresql://localhost/dummy";
 
 console.log("DATABASE_URL present:", !!process.env.DATABASE_URL);
 
